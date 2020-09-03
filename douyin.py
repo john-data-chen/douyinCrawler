@@ -1,12 +1,4 @@
 # -*- coding:utf-8 -*-
-'''
-Function:
-    批量下载抖音视频
-Author:
-    Charles
-微信公众号:
-    Charles的皮卡丘
-'''
 import os
 import re
 import sys
@@ -52,6 +44,7 @@ class Douyin():
     '''外部调用'''
 
     def run(self):
+        # read id from txt
         filepath = './idList.txt'
         fp = open(filepath, "r")
         userid = fp.readline()
@@ -87,6 +80,7 @@ class Douyin():
             print('目标用户的信息如下:')
             print(tb)
             self.__downloadUserVideos(userid, dytk, tac, nickname)
+            # next id
             userid = fp.readline()
 
     '''下载目标用户的所有视频'''
@@ -136,19 +130,24 @@ class Douyin():
     '''视频下载'''
 
     def __download(self, download_url, savename, savedir, nickname):
-        # sleep 1~3 secs
-        time.sleep(randint(1,3))
-        print('[INFO]: 正在下载 ——> %s' % savename)
+        print('[INFO]: checking ——> %s' % savename)
         # 视频文件保存位置
         path = "./download/" + str(nickname).strip() + savedir.strip() + "/"
         if not os.path.exists(path):
             os.makedirs(path)
         try:
             response = self.session.get(url=download_url, headers=self.ios_headers, stream=True, verify=False)
-            total_size = response.headers["content-length"]
-            p = 0
-            if response.status_code == 200:
-                print("[文件大小]: %.2f MB" % (int(total_size) / 1024 / 1024))
+        except:
+                print(f"download error, url: " + video_url)
+        total_size = response.headers["content-length"]
+        p = 0
+        if response.status_code == 200:
+            print("[文件大小]: %.2f MB" % (int(total_size) / 1024 / 1024))
+        # check video file exists
+        if not (os.path.isfile(os.path.join(path, savename + '.mp4'))):
+            # sleep 1~3 secs
+            time.sleep(randint(1,3))
+            try:
                 with open(os.path.join(path, savename + '.mp4'), "wb") as f:
                     # 开始下载每次请求1024字节
                     for i in response.iter_content(chunk_size=1024):
@@ -156,11 +155,11 @@ class Douyin():
                         f.write(i)
                         done = 50 * p / int(total_size)
                         sys.stdout.write("\r[%s%s] %.2f%%" % ('█' * int(done), '' * int(50 - done), done + done))
-                    sys.stdout.flush()
-                print("\n")
-        except Exception as e:
-            print(e)
-
+                        sys.stdout.flush()
+            except:
+                print(f"download error, url: " + video_url)
+        else:
+            print(os.path.join(path, savename + '.mp4') + ' is downloaded')
 
 '''run'''
 if __name__ == '__main__':
