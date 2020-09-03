@@ -11,12 +11,14 @@ import os
 import re
 import sys
 import time
+import json
 import click
 import execjs
 import warnings
 import requests
 import prettytable
 from lxml import etree
+from random import randint
 from contextlib import closing
 
 warnings.filterwarnings('ignore')
@@ -61,6 +63,8 @@ class Douyin():
             # 获取用户主页信息
             try:
                 response = self.session.get(self.user_url.format(userid), headers=self.headers)
+                # sleep 1~3 secs
+                time.sleep(randint(1,3))
                 html = response.text
                 for key, value in self.font_dict.items():
                     if key in html:
@@ -93,45 +97,53 @@ class Douyin():
         # 获取视频作品列表
         params = {
             'user_id': userid,
+            # 加密 uid，本接口下默认为空
             'sec_uid': '',
+            # 请求数量，固定值不变
             'count': '1000',
+            # 本次请求视频最大值，可从上一次请求的 response 中获取，初始为 0
             'max_cursor': '0',
+            # appid 固定不变
             'aid': '1128',
+            # 加密签名
             '_signature': signature,
+            # 用户 token
             'dytk': dytk
         }
-        response = self.session.get(self.video_url, headers=self.headers, params=params)
-        response_json = response.json()
-        all_items = response_json['aweme_list']
-        # print(all_items)
-        # 开始下载
-        for item in all_items:
-            savename = item['desc']
-            download_url = item['video']['play_addr']['url_list'][0]
-            self.__download(download_url, savename, str(userid), nickname)
+        while True:
+            try:
+                response = self.session.get(self.video_url, headers=self.headers, params=params)
+            except:
+                print(f"请求视频接口异常已跳过，当前请求参数为{params}")
+                continue
+            response_json = response.json()
+            # print(json.dumps(response_json, indent=4))
+            all_items = response_json['aweme_list']
+            # 获取 max_cursor 为下次请求做准备
+            max_cursor = response_json['max_cursor']
+            # 获取 has_more 参数，判断是否为最后一条请求
+            has_more = response_json['has_more']
+            if has_more:
+                params['max_cursor'] = max_cursor
+            else:
+                break
+            # 开始下载
+            for item in all_items:
+                savename = item['desc']
+                download_url = item['video']['play_addr']['url_list'][0]
+                self.__download(download_url, savename, str(userid), nickname)
 
     '''视频下载'''
 
     def __download(self, download_url, savename, savedir, nickname):
+        # sleep 1~3 secs
+        time.sleep(randint(1,3))
         print('[INFO]: 正在下载 ——> %s' % savename)
         # 视频文件保存位置
         path = "./download/" + str(nickname).strip() + savedir.strip() + "/"
         if not os.path.exists(path):
             os.makedirs(path)
         try:
-            # 下载方式一:
-            # with closing(self.session.get(download_url, headers=self.ios_headers, stream=True, verify=False)) as response:
-            #     total_size = int(response.headers['content-length'])
-            #     if response.status_code == 200:
-            #         label = '[FileSize]:%0.2f MB' % (total_size / (1024 * 1024))
-            #         with click.progressbar(length=total_size, label=label) as progressbar:
-            #             with open(os.path.join(savedir, savename + '.mp4'), "wb") as fp:
-            #                 for chunk in response.iter_content(chunk_size=1024):
-            #                     if chunk:
-            #                         fp.write(chunk)
-            #                         progressbar.update(1024)
-
-            # 下载方式二：
             response = self.session.get(url=download_url, headers=self.ios_headers, stream=True, verify=False)
             total_size = response.headers["content-length"]
             p = 0
