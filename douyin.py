@@ -17,6 +17,10 @@ warnings.filterwarnings('ignore')
 
 '''批量下载抖音视频'''
 
+RANDOM_DELAY = 3
+WAIT_AFTER_ERROR = 60
+DEFAULT_MAX_VIDEO = 50
+
 class Douyin():
     def __init__(self):
         self.user_url = 'https://www.amemv.com/share/user/{}'
@@ -47,17 +51,16 @@ class Douyin():
         # read id from txt
         filepath = './idList.txt'
         fp = open(filepath, "r")
-        userid = fp.readline()
+        lines = fp.readlines()
  
-        ## 用 while 逐行讀取檔案內容，直至檔案結尾
-        while userid:
+        for userid in lines:
             # remove space of string
             userid = userid.strip()
             # 获取用户主页信息
             try:
                 response = self.session.get(self.user_url.format(userid), headers=self.headers)
                 # sleep 1~3 secs
-                time.sleep(randint(1,3))
+                time.sleep(randint(1, RANDOM_DELAY))
                 html = response.text
                 for key, value in self.font_dict.items():
                     if key in html:
@@ -65,7 +68,7 @@ class Douyin():
                 assert 'dytk' in html
             except:
                 print('[Warning]: 用户ID ' + userid + '输入有误.')
-                time.sleep(randint(1,3))
+                time.sleep(randint(1, RANDOM_DELAY))
                 continue
             dytk = re.findall(r"dytk: '(.*?)'", html)[0]
             tac = re.findall(r"<script>tac='(.*?)'</script>", html)[0]
@@ -74,19 +77,37 @@ class Douyin():
             douyinid = ''.join(html.xpath('//p[@class="shortid"]/i/text()'))
             num_followers = ''.join(html.xpath('//span[@class="follower block"]/span[1]//text()')).strip()
             num_videos = ''.join(html.xpath('//div[@class="user-tab active tab get-list"]/span/i/text()'))
+
+            # 视频文件保存位置
+            path = "./download/" + str(nickname).strip() + str(userid).strip() + "/"
+            # create folder if not exists
+            if not os.path.exists(path):
+                os.makedirs(path)
+            num_videos = int(num_videos)
+            # if num_videos of id is incorrect, set a default value
+            if num_videos <= 0:
+                num_videos = DEFAULT_MAX_VIDEO
+            # total of downloaded videos
+            downloaded_videos = len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
+            # check downloaded percentage
+            if downloaded_videos / num_videos < 0.8:
+                print("downloaded percentage < 80%: " + str(nickname).strip() + str(userid).strip())
+            else:
+                print("downloaded percentage > 80%: " + str(nickname).strip() + str(userid))
+                continue
             # 打印用户主页信息供使用者确认
             tb = prettytable.PrettyTable()
             tb.field_names = ['昵称', '抖音ID', '粉丝数量', '作品数量']
             tb.add_row([nickname, douyinid, num_followers, num_videos])
             print('目标用户的信息如下:')
             print(tb)
-            self.__downloadUserVideos(userid, dytk, tac, nickname)
+            self.__downloadUserVideos(userid, dytk, tac, path)
             # next id
             userid = fp.readline()
 
     '''下载目标用户的所有视频'''
 
-    def __downloadUserVideos(self, userid, dytk, tac, nickname):
+    def __downloadUserVideos(self, userid, dytk, tac, path):
         # 获取signature
         signature = self.ctx.call('get_sign', userid, tac, self.headers['User-Agent'])
         # 获取视频作品列表
@@ -110,7 +131,7 @@ class Douyin():
                 response = self.session.get(self.video_url, headers=self.headers, params=params)
             except:
                 print(f"请求视频接口异常已跳过，当前请求参数为{params}")
-                time.sleep(randint(1,3))
+                time.sleep(randint(1, RANDOM_DELAY))
                 continue
             response_json = response.json()
             # print(json.dumps(response_json, indent=4))
@@ -119,9 +140,9 @@ class Douyin():
             try:
                 max_cursor = response_json['max_cursor']
             except:
-                print("no max_cursor counter: " + retry)
+                print("no max_cursor")
                 print(json.dumps(response_json, indent=4))
-                time.sleep(randint(1,60))
+                time.sleep(randint(1, WAIT_AFTER_ERROR))
                 continue
             # 获取 has_more 参数，判断是否为最后一条请求
             try:
@@ -130,14 +151,14 @@ class Douyin():
             except:
                 print("no has_more")
                 print(json.dumps(response_json, indent=4))
-                time.sleep(randint(1,60))
+                time.sleep(randint(1, WAIT_AFTER_ERROR))
                 continue
             # 开始下载
             for item in all_items:
                 savename = item['desc']
                 download_url = item['video']['play_addr']['url_list'][0]
                 try:
-                    self.__download(download_url, savename, str(userid), nickname)
+                    self.__download(download_url, savename, path)
                 except:
                     print("download " + savename + " fail")
                     time.sleep(randint(1, 3))
@@ -145,12 +166,8 @@ class Douyin():
 
     '''视频下载'''
 
-    def __download(self, download_url, savename, savedir, nickname):
+    def __download(self, download_url, savename, path):
         print('[INFO]: checking ——> %s' % savename)
-        # 视频文件保存位置
-        path = "./download/" + str(nickname).strip() + savedir.strip() + "/"
-        if not os.path.exists(path):
-            os.makedirs(path)
         response = self.session.get(url=download_url, headers=self.ios_headers, stream=True, verify=False)
         total_size = response.headers["content-length"]
         p = 0
