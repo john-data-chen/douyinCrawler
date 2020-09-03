@@ -64,8 +64,9 @@ class Douyin():
                         html = html.replace(key, value)
                 assert 'dytk' in html
             except:
-                print('[Warning]: 用户ID' + userid + '输入有误.')
-                break
+                print('[Warning]: 用户ID ' + userid + '输入有误.')
+                time.sleep(randint(1,3))
+                continue
             dytk = re.findall(r"dytk: '(.*?)'", html)[0]
             tac = re.findall(r"<script>tac='(.*?)'</script>", html)[0]
             html = etree.HTML(html)
@@ -109,23 +110,38 @@ class Douyin():
                 response = self.session.get(self.video_url, headers=self.headers, params=params)
             except:
                 print(f"请求视频接口异常已跳过，当前请求参数为{params}")
+                time.sleep(randint(1,3))
                 continue
             response_json = response.json()
             # print(json.dumps(response_json, indent=4))
             all_items = response_json['aweme_list']
             # 获取 max_cursor 为下次请求做准备
-            max_cursor = response_json['max_cursor']
+            try:
+                max_cursor = response_json['max_cursor']
+            except:
+                print("no max_cursor counter: " + retry)
+                print(json.dumps(response_json, indent=4))
+                time.sleep(randint(1,60))
+                continue
             # 获取 has_more 参数，判断是否为最后一条请求
-            has_more = response_json['has_more']
-            if has_more:
+            try:
+                has_more = response_json['has_more']
                 params['max_cursor'] = max_cursor
-            else:
-                break
+            except:
+                print("no has_more")
+                print(json.dumps(response_json, indent=4))
+                time.sleep(randint(1,60))
+                continue
             # 开始下载
             for item in all_items:
                 savename = item['desc']
                 download_url = item['video']['play_addr']['url_list'][0]
-                self.__download(download_url, savename, str(userid), nickname)
+                try:
+                    self.__download(download_url, savename, str(userid), nickname)
+                except:
+                    print("download " + savename + " fail")
+                    time.sleep(randint(1, 3))
+                    continue
 
     '''视频下载'''
 
@@ -135,29 +151,24 @@ class Douyin():
         path = "./download/" + str(nickname).strip() + savedir.strip() + "/"
         if not os.path.exists(path):
             os.makedirs(path)
-        try:
-            response = self.session.get(url=download_url, headers=self.ios_headers, stream=True, verify=False)
-        except:
-                print(f"download error, url: " + video_url)
+        response = self.session.get(url=download_url, headers=self.ios_headers, stream=True, verify=False)
         total_size = response.headers["content-length"]
         p = 0
         if response.status_code == 200:
             print("[文件大小]: %.2f MB" % (int(total_size) / 1024 / 1024))
         # check video file exists
         if not (os.path.isfile(os.path.join(path, savename + '.mp4'))):
-            # sleep 1~3 secs
+        # sleep 1~3 secs
             time.sleep(randint(1,3))
-            try:
-                with open(os.path.join(path, savename + '.mp4'), "wb") as f:
-                    # 开始下载每次请求1024字节
-                    for i in response.iter_content(chunk_size=1024):
-                        p += len(i)
-                        f.write(i)
-                        done = 50 * p / int(total_size)
-                        sys.stdout.write("\r[%s%s] %.2f%%" % ('█' * int(done), '' * int(50 - done), done + done))
-                        sys.stdout.flush()
-            except:
-                print(f"download error, url: " + video_url)
+            with open(os.path.join(path, savename + '.mp4'), "wb") as f:
+                # 开始下载每次请求1024字节
+                for i in response.iter_content(chunk_size=1024):
+                    p += len(i)
+                    f.write(i)
+                    done = 50 * p / int(total_size)
+                    sys.stdout.write("\r[%s%s] %.2f%%" % ('█' * int(done), '' * int(50 - done), done + done))
+                    sys.stdout.flush()
+            print("\n")
         else:
             print(os.path.join(path, savename + '.mp4') + ' is downloaded')
 
