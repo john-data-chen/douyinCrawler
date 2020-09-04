@@ -21,6 +21,18 @@ RANDOM_DELAY = 3
 WAIT_AFTER_ERROR = 60
 DEFAULT_MAX_VIDEO = 50
 
+# add downloaded percentage check
+def downloaded_checker(num_videos, path):
+    num_videos = int(num_videos)
+    # if num_videos of id is incorrect, set a default value
+    if num_videos <= 0:
+        num_videos = DEFAULT_MAX_VIDEO
+    # total of downloaded videos
+    downloaded_videos = len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
+        # check downloaded percentage
+    downloaded_percentage = downloaded_videos / num_videos
+    return downloaded_percentage
+
 class Douyin():
     def __init__(self):
         self.user_url = 'https://www.amemv.com/share/user/{}'
@@ -83,19 +95,17 @@ class Douyin():
             # create folder if not exists
             if not os.path.exists(path):
                 os.makedirs(path)
-            num_videos = int(num_videos)
-            # if num_videos of id is incorrect, set a default value
-            if num_videos <= 0:
-                num_videos = DEFAULT_MAX_VIDEO
-            # total of downloaded videos
-            downloaded_videos = len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
             # check downloaded percentage
-            downloaded_percentage = downloaded_videos / num_videos
+            downloaded_percentage = downloaded_checker(num_videos, path)
             if downloaded_percentage < 0.9:
                 print("downloaded percentage < 90%: " + str(nickname).strip() + str(userid).strip())
             else:
                 print("downloaded percentage > 90%: " + str(nickname).strip() + str(userid))
-                continue
+                # if this is last id, exit
+                if userid.strip() == lines[-1]:
+                    break
+                else:
+                    continue
             # 打印用户主页信息供使用者确认
             tb = prettytable.PrettyTable()
             tb.field_names = ['昵称', '抖音ID', '粉丝数量', '作品数量']
@@ -108,7 +118,7 @@ class Douyin():
 
     '''下载目标用户的所有视频'''
 
-    def __downloadUserVideos(self, userid, dytk, tac, path, nickname, downloaded_percentage):
+    def __downloadUserVideos(self, userid, dytk, tac, path, nickname, num_videos):
         # 获取signature
         signature = self.ctx.call('get_sign', userid, tac, self.headers['User-Agent'])
         # 获取视频作品列表
@@ -140,6 +150,8 @@ class Douyin():
             all_items = response_json['aweme_list']
             # if retry 6 times and download 90% videos, then skip to next id
             if counter > 5:
+                # check downloaded percentage
+                downloaded_percentage = downloaded_checker(num_videos, path)
                 if downloaded_percentage < 0.9:
                     print("downloaded percentage < 90%: " + str(nickname).strip() + str(userid).strip())
                 else:
