@@ -90,10 +90,11 @@ class Douyin():
             # total of downloaded videos
             downloaded_videos = len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
             # check downloaded percentage
-            if downloaded_videos / num_videos < 0.8:
-                print("downloaded percentage < 80%: " + str(nickname).strip() + str(userid).strip())
+            downloaded_percentage = downloaded_videos / num_videos
+            if downloaded_percentage < 0.9:
+                print("downloaded percentage < 90%: " + str(nickname).strip() + str(userid).strip())
             else:
-                print("downloaded percentage > 80%: " + str(nickname).strip() + str(userid))
+                print("downloaded percentage > 90%: " + str(nickname).strip() + str(userid))
                 continue
             # 打印用户主页信息供使用者确认
             tb = prettytable.PrettyTable()
@@ -101,13 +102,13 @@ class Douyin():
             tb.add_row([nickname, douyinid, num_followers, num_videos])
             print('目标用户的信息如下:')
             print(tb)
-            self.__downloadUserVideos(userid, dytk, tac, path)
+            self.__downloadUserVideos(userid, dytk, tac, path, nickname, downloaded_percentage)
             # next id
             userid = fp.readline()
 
     '''下载目标用户的所有视频'''
 
-    def __downloadUserVideos(self, userid, dytk, tac, path):
+    def __downloadUserVideos(self, userid, dytk, tac, path, nickname, downloaded_percentage):
         # 获取signature
         signature = self.ctx.call('get_sign', userid, tac, self.headers['User-Agent'])
         # 获取视频作品列表
@@ -126,6 +127,7 @@ class Douyin():
             # 用户 token
             'dytk': dytk
         }
+        counter = 0
         while True:
             try:
                 response = self.session.get(self.video_url, headers=self.headers, params=params)
@@ -136,6 +138,13 @@ class Douyin():
             response_json = response.json()
             # print(json.dumps(response_json, indent=4))
             all_items = response_json['aweme_list']
+            # if retry 6 times and download 90% videos, then skip to next id
+            if counter > 5:
+                if downloaded_percentage < 0.9:
+                    print("downloaded percentage < 90%: " + str(nickname).strip() + str(userid).strip())
+                else:
+                    print("downloaded percentage > 90%: " + str(nickname).strip() + str(userid))
+                    break
             # 获取 max_cursor 为下次请求做准备
             try:
                 max_cursor = response_json['max_cursor']
@@ -143,6 +152,7 @@ class Douyin():
                 print("no max_cursor")
                 print(json.dumps(response_json, indent=4))
                 time.sleep(randint(1, WAIT_AFTER_ERROR))
+                counter += 1
                 continue
             # 获取 has_more 参数，判断是否为最后一条请求
             try:
@@ -152,6 +162,7 @@ class Douyin():
                 print("no has_more")
                 print(json.dumps(response_json, indent=4))
                 time.sleep(randint(1, WAIT_AFTER_ERROR))
+                counter += 1
                 continue
             # 开始下载
             for item in all_items:
