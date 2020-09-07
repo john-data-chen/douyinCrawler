@@ -17,13 +17,19 @@ warnings.filterwarnings('ignore')
 
 '''批量下载抖音视频'''
 
-RANDOM_DELAY = 3
-WAIT_AFTER_ERROR = 60
+RANDOM_MAX_DELAY = 3
+WAIT_MIN = 10
+WAIT_MAX = 60
 DEFAULT_MAX_VIDEO = 50
 
 # add downloaded percentage check
 def downloaded_checker(num_videos, path):
-    num_videos = int(num_videos)
+    # check num_videos is valid, if not set to 0
+    try:
+        num_videos = int(num_videos)
+    except:
+        print("num_videos is not valid: " + num_videos)
+        num_videos = 0
     # if num_videos of id is incorrect, set a default value
     if num_videos <= 0:
         num_videos = DEFAULT_MAX_VIDEO
@@ -72,7 +78,7 @@ class Douyin():
             try:
                 response = self.session.get(self.user_url.format(userid), headers=self.headers)
                 # sleep 1~3 secs
-                time.sleep(randint(1, RANDOM_DELAY))
+                time.sleep(randint(1, RANDOM_MAX_DELAY))
                 html = response.text
                 for key, value in self.font_dict.items():
                     if key in html:
@@ -80,7 +86,7 @@ class Douyin():
                 assert 'dytk' in html
             except:
                 print('[Warning]: 用户ID ' + userid + '输入有误.')
-                time.sleep(randint(1, RANDOM_DELAY))
+                time.sleep(randint(1, RANDOM_MAX_DELAY))
                 continue
             dytk = re.findall(r"dytk: '(.*?)'", html)[0]
             tac = re.findall(r"<script>tac='(.*?)'</script>", html)[0]
@@ -143,7 +149,7 @@ class Douyin():
                 response = self.session.get(self.video_url, headers=self.headers, params=params)
             except:
                 print(f"请求视频接口异常已跳过，当前请求参数为{params}")
-                time.sleep(randint(1, RANDOM_DELAY))
+                time.sleep(randint(1, RANDOM_MAX_DELAY))
                 continue
             response_json = response.json()
             # print(json.dumps(response_json, indent=4))
@@ -163,7 +169,7 @@ class Douyin():
             except:
                 print("no max_cursor")
                 print(json.dumps(response_json, indent=4))
-                time.sleep(randint(1, WAIT_AFTER_ERROR))
+                time.sleep(randint(WAIT_MIN, WAIT_MAX))
                 counter += 1
                 continue
             # 获取 has_more 参数，判断是否为最后一条请求
@@ -173,7 +179,7 @@ class Douyin():
             except:
                 print("no has_more")
                 print(json.dumps(response_json, indent=4))
-                time.sleep(randint(1, WAIT_AFTER_ERROR))
+                time.sleep(randint(WAIT_MIN, WAIT_MAX))
                 counter += 1
                 continue
             # 开始下载
@@ -192,25 +198,33 @@ class Douyin():
     def __download(self, download_url, savename, path):
         print('[INFO]: checking ——> %s' % savename)
         response = self.session.get(url=download_url, headers=self.ios_headers, stream=True, verify=False)
-        total_size = response.headers["content-length"]
-        p = 0
-        if response.status_code == 200:
-            print("[文件大小]: %.2f MB" % (int(total_size) / 1024 / 1024))
-        # check video file exists
-        if not (os.path.isfile(os.path.join(path, savename + '.mp4'))):
-        # sleep 1~3 secs
-            time.sleep(randint(1,3))
-            with open(os.path.join(path, savename + '.mp4'), "wb") as f:
-                # 开始下载每次请求1024字节
-                for i in response.iter_content(chunk_size=1024):
-                    p += len(i)
-                    f.write(i)
-                    done = 50 * p / int(total_size)
-                    sys.stdout.write("\r[%s%s] %.2f%%" % ('█' * int(done), '' * int(50 - done), done + done))
-                    sys.stdout.flush()
-            print("\n")
+        # check download size, if incorrect meaning blocked, sleep randomly
+        if (response.headers["content-length"]):
+            total_size = response.headers["content-length"]
+        if (response.headers["Content-Length"]):
+            total_size = response.headers["Content-Length"]
+        if (int(total_size) == 0):
+            print("invalid total_size, sleep...")
+            time.sleep(randint(WAIT_MIN, WAIT_MAX))
         else:
-            print(os.path.join(path, savename + '.mp4') + ' is downloaded')
+            p = 0
+            if response.status_code == 200:
+                print("[文件大小]: %.2f MB" % (int(total_size) / 1024 / 1024))
+            # check video file exists
+            if not (os.path.isfile(os.path.join(path, savename + '.mp4'))):
+            # sleep 1~3 secs
+                time.sleep(randint(1,3))
+                with open(os.path.join(path, savename + '.mp4'), "wb") as f:
+                    # 开始下载每次请求1024字节
+                    for i in response.iter_content(chunk_size=1024):
+                        p += len(i)
+                        f.write(i)
+                        done = 50 * p / int(total_size)
+                        sys.stdout.write("\r[%s%s] %.2f%%" % ('█' * int(done), '' * int(50 - done), done + done))
+                        sys.stdout.flush()
+                print("\n")
+            else:
+                print(os.path.join(path, savename + '.mp4') + ' is downloaded')
 
 '''run'''
 if __name__ == '__main__':
