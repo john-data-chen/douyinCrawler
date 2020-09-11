@@ -3,3 +3,4 @@ download
 .idea
 *.mp4
 *.txt
+*.pyc

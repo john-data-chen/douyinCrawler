@@ -22,6 +22,29 @@ WAIT_MIN = 10
 WAIT_MAX = 60
 DEFAULT_MAX_VIDEO = 50
 
+proxies = {
+    'http': 'http://115.238.65.118:80',
+    'https': 'https://103.105.58.84:3128',
+}
+
+def random_pc_user_agent():
+    userAgents = [
+        'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20120101 Firefox/33.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10; rv:33.0) Gecko/20100101 Firefox/33.0',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10; rv:33.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36'
+    ]
+    return userAgents[randint(0, len(userAgents)-1)]
+
+def random_ios_user_agent():
+    userAgents = [
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Mobile/15E148 Safari/604.1',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 12_1_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/16D57',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 13_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Mobile/15E148 Safari/604.1'
+    ]
+    return userAgents[randint(0, len(userAgents)-1)]
+
 # add downloaded percentage check
 def downloaded_checker(num_videos, path):
     # check num_videos is valid, if not set to 0
@@ -45,10 +68,10 @@ class Douyin():
         self.video_url = 'https://www.iesdouyin.com/web/api/v2/aweme/post/'
         self.session = requests.Session()
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.89 Safari/537.36'
+            'User-Agent': random_pc_user_agent()
         }
         self.ios_headers = {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_2 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13C75 Safari/601.1'
+            'User-Agent': random_ios_user_agent()
         }
         fp = open('./encrypt.js', 'r', encoding='utf-8')
         self.ctx = execjs.compile(fp.read())
@@ -76,7 +99,7 @@ class Douyin():
             userid = userid.strip()
             # 获取用户主页信息
             try:
-                response = self.session.get(self.user_url.format(userid), headers=self.headers)
+                response = self.session.get(self.user_url.format(userid), headers=self.headers, proxies=proxies)
                 # sleep 1~3 secs
                 time.sleep(randint(1, RANDOM_MAX_DELAY))
                 html = response.text
@@ -146,7 +169,7 @@ class Douyin():
         counter = 0
         while True:
             try:
-                response = self.session.get(self.video_url, headers=self.headers, params=params)
+                response = self.session.get(self.video_url, headers=self.headers, params=params, proxies=proxies)
             except:
                 print(f"请求视频接口异常已跳过，当前请求参数为{params}")
                 time.sleep(randint(1, RANDOM_MAX_DELAY))
@@ -197,7 +220,7 @@ class Douyin():
 
     def __download(self, download_url, savename, path):
         print('[INFO]: checking ——> %s' % savename)
-        response = self.session.get(url=download_url, headers=self.ios_headers, stream=True, verify=False)
+        response = self.session.get(url=download_url, headers=self.ios_headers, stream=True, verify=False, proxies=proxies)
         # check download size, if incorrect meaning blocked, sleep randomly
         if (response.headers["content-length"]):
             total_size = response.headers["content-length"]
