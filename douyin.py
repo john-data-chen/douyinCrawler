@@ -1,17 +1,16 @@
 # -*- coding:utf-8 -*-
+import json
 import os
 import re
 import sys
 import time
-import json
-import click
-import execjs
 import warnings
-import requests
-import prettytable
-from lxml import etree
 from random import randint
-from contextlib import closing
+
+import execjs
+import prettytable
+import requests
+from lxml import etree
 
 warnings.filterwarnings('ignore')
 
