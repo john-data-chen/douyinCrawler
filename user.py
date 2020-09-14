@@ -21,9 +21,11 @@ WAIT_MIN = 10
 WAIT_MAX = 60
 DEFAULT_MAX_VIDEO = 50
 
+FILEPATH = './userList.txt'
+
 proxies = {
-    'http': 'http://115.238.65.118:80',
-    'https': 'https://103.105.58.84:3128',
+    # 'http': 'http://115.238.65.118:80',
+    # 'https': 'https://103.105.58.84:3128',
 }
 
 def random_pc_user_agent():
@@ -89,8 +91,7 @@ class Douyin():
 
     def run(self):
         # read id from txt
-        filepath = './idList.txt'
-        fp = open(filepath, "r")
+        fp = open(FILEPATH, "r")
         lines = fp.readlines()
  
         for userid in lines:
